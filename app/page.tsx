@@ -232,7 +232,7 @@ export default function Home() {
       {/* Background gradient glow */}
       <div className="pointer-events-none fixed inset-x-0 top-0 h-[500px] bg-[radial-gradient(ellipse_at_50%_0%,rgba(99,102,241,0.08)_0%,transparent_70%)]" />
 
-      <div className="relative z-10 mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8">
+      <div className="relative z-10 mx-auto max-w-[1500px] px-3 py-4 sm:px-6 sm:py-8 lg:px-8">
 
         {/* ──────────────── HEADER ──────────────── */}
         <header className="relative flex flex-col items-center justify-center mb-6 sm:mb-8 animate-fade-in-up">
@@ -273,7 +273,7 @@ export default function Home() {
         {/* ──────────────── STATS ──────────────── */}
         {
           data && (
-            <div className={`grid grid-cols-2 sm:grid-cols-3 ${data.include_delta ? 'lg:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-5'} gap-3 mb-8 animate-fade-in-up`} style={{ animationDelay: "0.1s" }}>
+            <div className={`grid grid-cols-2 sm:grid-cols-3 ${data.include_delta ? 'lg:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-5'} gap-2 sm:gap-3 mb-6 sm:mb-8 animate-fade-in-up`} style={{ animationDelay: "0.1s" }}>
               {[
                 { label: "Opportunities", value: data.count, color: "text-emerald-400" },
                 { label: "Binance Pairs", value: data.exchange_counts.Binance ?? 0, color: "text-yellow-400" },
@@ -283,11 +283,11 @@ export default function Home() {
                 { label: "Total Symbols", value: data.total_symbols, color: "text-indigo-400" },
               ].map((stat) => (
                 <Card key={stat.label} className="border-border/50 bg-card/50 backdrop-blur-sm">
-                  <CardContent className="p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                  <CardContent className="p-3 sm:p-4">
+                    <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                       {stat.label}
                     </p>
-                    <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>
+                    <p className={`text-xl sm:text-2xl font-bold tabular-nums ${stat.color}`}>
                       {stat.value.toLocaleString()}
                     </p>
                   </CardContent>
@@ -298,23 +298,23 @@ export default function Home() {
         }
 
         {/* ──────────────── CONTROLS & SETTINGS ──────────────── */}
-        <Card className="border-border/50 bg-card/50 backdrop-blur-sm mb-6 animate-fade-in-up" style={{ animationDelay: "0.25s" }}>
-          <CardContent className="p-5">
-            <div className="flex flex-col xl:flex-row items-end justify-between gap-6 xl:gap-10">
+        <Card className="border-border/50 bg-card/50 backdrop-blur-sm mb-4 sm:mb-6 animate-fade-in-up" style={{ animationDelay: "0.25s" }}>
+          <CardContent className="p-3 sm:p-5">
+            <div className="flex flex-col xl:flex-row items-stretch xl:items-end justify-between gap-4 xl:gap-10">
 
               {/* Left Group: Threshold + Scan Button */}
-              <div className="flex flex-col sm:flex-row items-end gap-4 w-full xl:w-auto justify-center xl:justify-start">
+              <div className="flex flex-row items-end gap-3 sm:gap-4 w-full xl:w-auto justify-center xl:justify-start">
 
                 {/* Threshold Stepper */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <label className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Threshold (%)
                   </label>
                   <div className="flex items-center">
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-10 w-10 rounded-r-none border-r-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      className="h-9 w-9 sm:h-10 sm:w-10 rounded-r-none border-r-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                       onClick={() => {
                         const v = Math.max(0, (parseFloat(threshold) || 0) - 0.1);
                         setThreshold(v.toFixed(1));
@@ -322,7 +322,7 @@ export default function Home() {
                     >
                       <ChevronDownIcon />
                     </Button>
-                    <div className="h-10 w-20 border-y border-border bg-background flex items-center justify-center">
+                    <div className="h-9 w-16 sm:h-10 sm:w-20 border-y border-border bg-background flex items-center justify-center">
                       <input
                         type="text"
                         value={threshold}
@@ -333,7 +333,7 @@ export default function Home() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-10 w-10 rounded-l-none border-l-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      className="h-9 w-9 sm:h-10 sm:w-10 rounded-l-none border-l-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                       onClick={() => {
                         const v = (parseFloat(threshold) || 0) + 0.1;
                         setThreshold(v.toFixed(1));
@@ -344,11 +344,11 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Scan Button (Right side of Threshold) */}
+                {/* Scan Button */}
                 <Button
                   onClick={fetchData}
                   disabled={loading}
-                  className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 hover:-translate-y-0.5 disabled:opacity-60 h-10 px-6 font-bold"
+                  className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 hover:-translate-y-0.5 disabled:opacity-60 h-9 sm:h-10 px-4 sm:px-6 font-bold text-sm"
                 >
                   {loading ? (
                     <>
@@ -365,16 +365,16 @@ export default function Home() {
               </div>
 
               {/* Right Group: Capital */}
-              <div className="flex flex-wrap items-end justify-center xl:justify-end gap-5 w-full xl:w-auto border-t xl:border-t-0 border-border/30 pt-4 xl:pt-0">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end justify-center xl:justify-end gap-3 sm:gap-5 w-full xl:w-auto border-t xl:border-t-0 border-border/30 pt-3 xl:pt-0">
 
-                {/* Capital Label */}
-                <div className="flex items-center gap-2 mb-2 lg:mb-3">
-                  <DollarIcon className="text-emerald-400 h-5 w-5" />
-                  <span className="text-base font-bold text-foreground">Capital</span>
+                {/* Capital Label - hidden on very small screens, shown as row header */}
+                <div className="col-span-2 sm:col-span-1 flex items-center gap-2 mb-0 sm:mb-2 lg:mb-3">
+                  <DollarIcon className="text-emerald-400 h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="text-sm sm:text-base font-bold text-foreground">Capital</span>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <label className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     USDT Amount
                   </label>
                   <input
@@ -382,12 +382,12 @@ export default function Home() {
                     value={usdt}
                     onChange={(e) => setUsdt(e.target.value)}
                     placeholder="1000"
-                    className="h-10 w-32 rounded-md border border-border bg-background px-3 text-sm font-bold text-foreground tabular-nums placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                    className="h-9 sm:h-10 w-full sm:w-32 rounded-md border border-border bg-background px-3 text-sm font-bold text-foreground tabular-nums placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <label className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Leverage
                   </label>
                   <div className="flex items-center gap-2">
@@ -396,18 +396,18 @@ export default function Home() {
                       value={leverage}
                       onChange={(e) => setLeverage(e.target.value)}
                       placeholder="10"
-                      className="h-10 w-20 rounded-md border border-border bg-background px-3 text-sm font-bold text-foreground tabular-nums placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                      className="h-9 sm:h-10 w-full sm:w-20 rounded-md border border-border bg-background px-3 text-sm font-bold text-foreground tabular-nums placeholder:text-muted-foreground focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                     />
                     <span className="text-sm text-muted-foreground font-medium">×</span>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="col-span-2 sm:col-span-1 flex flex-col gap-1.5">
+                  <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Position Size
                   </span>
-                  <div className="h-10 flex items-center px-4 rounded-md border border-indigo-500/30 bg-indigo-500/10">
-                    <span className="text-base font-bold tabular-nums text-indigo-400">
+                  <div className="h-9 sm:h-10 flex items-center justify-center px-4 rounded-md border border-indigo-500/30 bg-indigo-500/10">
+                    <span className="text-sm sm:text-base font-bold tabular-nums text-indigo-400">
                       ${positionSize.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -458,14 +458,14 @@ export default function Home() {
                     className="border-border/50 bg-card/80 backdrop-blur-sm overflow-hidden animate-fade-in-up"
                     style={{ animationDelay: `${0.3 + idx * 0.04}s` }}
                   >
-                    <CardContent className="p-4">
+                    <CardContent className="p-3 sm:p-4">
                       {/* Top row: rank + symbol + diff badge */}
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2.5">
-                          <span className={`font-extrabold text-lg tabular-nums ${globalIndex < 3 ? "text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.4)]" : "text-muted-foreground"}`}>
+                          <span className={`font-extrabold text-base tabular-nums ${globalIndex < 3 ? "text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.4)]" : "text-muted-foreground"}`}>
                             #{globalIndex + 1}
                           </span>
-                          <span className="font-bold text-base text-foreground tracking-wide">{opp.symbol}</span>
+                          <span className="font-bold text-sm sm:text-base text-foreground tracking-wide truncate max-w-[120px] sm:max-w-none">{opp.symbol}</span>
                           <Button
                             variant="ghost"
                             size="icon-xs"
@@ -484,18 +484,18 @@ export default function Home() {
                       </div>
 
                       {/* Exchange rates row */}
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5">
-                          <p className={`text-xs font-semibold mb-0.5 ${getExchangeColor(opp.exchange1)}`}>{opp.exchange1}</p>
-                          <p className="text-[10px] text-muted-foreground font-mono mb-1">{opp.original_symbol1}</p>
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-3">
+                        <div className="rounded-lg border border-border/40 bg-muted/20 p-2 sm:p-2.5">
+                          <p className={`text-[11px] sm:text-xs font-semibold mb-0.5 ${getExchangeColor(opp.exchange1)}`}>{opp.exchange1}</p>
+                          <p className="text-[9px] sm:text-[10px] text-muted-foreground font-mono mb-1 truncate">{opp.original_symbol1}</p>
                           <p className={`text-sm font-bold tabular-nums ${opp.rate1 > 0 ? "text-emerald-400" : opp.rate1 < 0 ? "text-red-400" : "text-muted-foreground"}`}>
                             {opp.rate1_fmt}
                           </p>
                           <p className="text-[10px] text-muted-foreground tabular-nums mt-0.5">{opp.next_funding1}</p>
                         </div>
-                        <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5">
-                          <p className={`text-xs font-semibold mb-0.5 ${getExchangeColor(opp.exchange2)}`}>{opp.exchange2}</p>
-                          <p className="text-[10px] text-muted-foreground font-mono mb-1">{opp.original_symbol2}</p>
+                        <div className="rounded-lg border border-border/40 bg-muted/20 p-2 sm:p-2.5">
+                          <p className={`text-[11px] sm:text-xs font-semibold mb-0.5 ${getExchangeColor(opp.exchange2)}`}>{opp.exchange2}</p>
+                          <p className="text-[9px] sm:text-[10px] text-muted-foreground font-mono mb-1 truncate">{opp.original_symbol2}</p>
                           <p className={`text-sm font-bold tabular-nums ${opp.rate2 > 0 ? "text-emerald-400" : opp.rate2 < 0 ? "text-red-400" : "text-muted-foreground"}`}>
                             {opp.rate2_fmt}
                           </p>
@@ -506,11 +506,11 @@ export default function Home() {
                       {/* Strategy + Profit row */}
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex flex-wrap gap-1.5">
-                          <Badge variant="outline" className="border-red-500/20 bg-red-500/5 text-red-400 text-[10px] font-semibold gap-1">
+                          <Badge variant="outline" className="border-red-500/20 bg-red-500/5 text-red-400 text-[9px] sm:text-[10px] font-semibold gap-1">
                             <TrendingDownIcon className="h-3 w-3" />
                             Short {opp.short_exchange}
                           </Badge>
-                          <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-[10px] font-semibold gap-1">
+                          <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-[9px] sm:text-[10px] font-semibold gap-1">
                             <TrendingUpIcon className="h-3 w-3" />
                             Long {opp.long_exchange}
                           </Badge>
