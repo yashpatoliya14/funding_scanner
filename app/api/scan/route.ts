@@ -3,10 +3,11 @@ import { scan } from "@/lib/scanner";
 
 export const dynamic = "force-dynamic";
 
-// Vercel serverless functions default to 10s; bump to 30s for exchange APIs
-export const maxDuration = 30;
+// Vercel serverless functions default to 10s; bump to 60s for exchange APIs (Pro plan)
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
+    console.log("Starting funding rate scan...");
     try {
         // Read query params for threshold and delta toggle
         const searchParams = request.nextUrl.searchParams;
