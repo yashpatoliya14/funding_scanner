@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
@@ -17,6 +17,13 @@ export const metadata: Metadata = {
   title: "Funding Rate Scanner — Crypto Arbitrage",
   description:
     "Real-time funding rate arbitrage scanner across Binance, Bybit, and Delta Exchange. Find profitable funding rate differences instantly.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
