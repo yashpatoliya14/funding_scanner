@@ -60,7 +60,7 @@ export interface ScanResult {
 // Fetch helpers (with timeout)
 // ---------------------------------------------------------------------------
 
-async function fetchJSON(url: string, params?: Record<string, string>, timeoutMs = 10_000) {
+async function fetchJSON(url: string, params?: Record<string, string>, timeoutMs = 7_000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -291,14 +291,24 @@ export async function scan(
     minDiff: number = DEFAULT_MIN_FUNDING_DIFF,
     includeDelta: boolean = true
 ): Promise<ScanResult> {
-    // Fetch all exchanges in parallel
-    const [binanceFunding, bybitFunding, coindcxFunding, deltaFunding] =
-        await Promise.all([
-            loadBinanceFunding(),
-            loadBybitFunding(),
-            loadCoinDCXFunding(),
-            (includeDelta ? loadDeltaFunding() : Promise.resolve({})) as Promise<Record<string, FundingEntry>>,
-        ]);
+    // Fetch all exchanges in parallel — use allSettled so one failure doesn't kill the scan
+    const results = await Promise.allSettled([
+        loadBinanceFunding(),
+        loadBybitFunding(),
+        loadCoinDCXFunding(),
+        (includeDelta ? loadDeltaFunding() : Promise.resolve({})) as Promise<Record<string, FundingEntry>>,
+    ]);
+
+    const binanceFunding = results[0].status === "fulfilled" ? results[0].value : {};
+    const bybitFunding = results[1].status === "fulfilled" ? results[1].value : {};
+    const coindcxFunding = results[2].status === "fulfilled" ? results[2].value : {};
+    const deltaFunding = results[3].status === "fulfilled" ? results[3].value : {};
+
+    // Log any failures (visible in Vercel function logs)
+    if (results[0].status === "rejected") console.error("Binance fetch failed:", results[0].reason);
+    if (results[1].status === "rejected") console.error("Bybit fetch failed:", results[1].reason);
+    if (results[2].status === "rejected") console.error("CoinDCX fetch failed:", results[2].reason);
+    if (results[3].status === "rejected" && includeDelta) console.error("Delta fetch failed:", results[3].reason);
 
     // Build normalised maps
     const exchangeData: Record<string, Record<string, FundingEntry>> = {
