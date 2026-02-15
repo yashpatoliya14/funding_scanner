@@ -26,6 +26,8 @@ interface Opportunity {
   symbol: string;
   exchange1: string;
   exchange2: string;
+  original_symbol1: string;
+  original_symbol2: string;
   rate1: number;
   rate2: number;
   rate1_fmt: string;
@@ -36,10 +38,6 @@ interface Opportunity {
   long_exchange: string;
   next_funding1: string;
   next_funding2: string;
-  url1: string;
-  url2: string;
-  short_url: string;
-  long_url: string;
   price1: number;
   price2: number;
   price_diff: number;
@@ -73,16 +71,6 @@ function CheckIcon({ className }: { className?: string }) {
   return (
     <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function ExternalLinkIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-      <polyline points="15 3 21 3 21 9" />
-      <line x1="10" y1="14" x2="21" y2="3" />
     </svg>
   );
 }
@@ -163,21 +151,6 @@ function getExchangeColor(exchange: string) {
       return "text-blue-400";
     default:
       return "text-muted-foreground";
-  }
-}
-
-function getExchangeBorder(exchange: string) {
-  switch (exchange) {
-    case "Binance":
-      return "border-yellow-500/30 hover:border-yellow-500/60 hover:bg-yellow-500/5";
-    case "Bybit":
-      return "border-orange-500/30 hover:border-orange-500/60 hover:bg-orange-500/5";
-    case "Delta":
-      return "border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-500/5";
-    case "CoinDCX":
-      return "border-blue-500/30 hover:border-blue-500/60 hover:bg-blue-500/5";
-    default:
-      return "border-border hover:bg-muted";
   }
 }
 
@@ -262,7 +235,7 @@ export default function Home() {
       <div className="relative z-10 mx-auto max-w-[1500px] px-4 py-8 sm:px-6 lg:px-8">
 
         {/* ──────────────── HEADER ──────────────── */}
-        <header className="relative flex flex-col items-center justify-center mb-8 animate-fade-in-up">
+        <header className="relative flex flex-col items-center justify-center mb-6 sm:mb-8 animate-fade-in-up">
           {data && (
             <div className="absolute top-0 right-0 hidden sm:flex items-center gap-2 text-xs font-medium text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full border border-border/50">
               <span className="relative flex h-2 w-2">
@@ -273,18 +246,27 @@ export default function Home() {
             </div>
           )}
 
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-3 mb-2">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-2xl shadow-lg shadow-indigo-500/30 animate-glow">
+          <div className="text-center mb-4 sm:mb-6">
+            <div className="inline-flex items-center gap-2 sm:gap-3 mb-2">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-xl sm:text-2xl shadow-lg shadow-indigo-500/30 animate-glow">
                 ⚡
               </div>
-              <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-white to-indigo-300 bg-clip-text text-transparent sm:text-4xl">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-indigo-300 bg-clip-text text-transparent">
                 Funding Rate Scanner
               </h1>
             </div>
-            <p className="text-muted-foreground text-sm">
-              Real-time funding rate arbitrage — Binance · Bybit · Delta Exchange · CoinDCX
+            <p className="text-muted-foreground text-xs sm:text-sm">
+              Real-time funding rate arbitrage — Binance · Bybit · Delta · CoinDCX
             </p>
+            {data && (
+              <div className="sm:hidden flex items-center justify-center gap-2 text-[11px] font-medium text-muted-foreground mt-2">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                </span>
+                <span>{data.scan_time}</span>
+              </div>
+            )}
           </div>
         </header>
 
@@ -464,10 +446,118 @@ export default function Home() {
           )
         }
 
-        {/* ──────────────── TABLE ──────────────── */}
+        {/* ──────────────── MOBILE CARDS (< lg) ──────────────── */}
         {
           data && data.opportunities.length > 0 && (
-            <Card className="border-border/50 bg-card/80 backdrop-blur-sm shadow-2xl shadow-black/20 overflow-hidden animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+            <div className="lg:hidden space-y-3 mb-4 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
+              {currentItems.map((opp, idx) => {
+                const globalIndex = (currentPage - 1) * itemsPerPage + idx;
+                return (
+                  <Card
+                    key={`m-${opp.symbol}-${opp.exchange1}-${opp.exchange2}`}
+                    className="border-border/50 bg-card/80 backdrop-blur-sm overflow-hidden animate-fade-in-up"
+                    style={{ animationDelay: `${0.3 + idx * 0.04}s` }}
+                  >
+                    <CardContent className="p-4">
+                      {/* Top row: rank + symbol + diff badge */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className={`font-extrabold text-lg tabular-nums ${globalIndex < 3 ? "text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.4)]" : "text-muted-foreground"}`}>
+                            #{globalIndex + 1}
+                          </span>
+                          <span className="font-bold text-base text-foreground tracking-wide">{opp.symbol}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            className={`transition-all ${copiedSymbol === opp.symbol ? "text-emerald-400 bg-emerald-500/10" : "text-muted-foreground hover:text-foreground"}`}
+                            onClick={() => copySymbol(opp.symbol)}
+                          >
+                            {copiedSymbol === opp.symbol ? <CheckIcon /> : <CopyIcon />}
+                          </Button>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`tabular-nums text-xs font-bold gap-1 ${opp.diff >= 0.01 ? "border-red-500/30 bg-red-500/10 text-red-400" : "border-amber-500/30 bg-amber-500/10 text-amber-400"}`}
+                        >
+                          🔥 {opp.diff_fmt}
+                        </Badge>
+                      </div>
+
+                      {/* Exchange rates row */}
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5">
+                          <p className={`text-xs font-semibold mb-0.5 ${getExchangeColor(opp.exchange1)}`}>{opp.exchange1}</p>
+                          <p className="text-[10px] text-muted-foreground font-mono mb-1">{opp.original_symbol1}</p>
+                          <p className={`text-sm font-bold tabular-nums ${opp.rate1 > 0 ? "text-emerald-400" : opp.rate1 < 0 ? "text-red-400" : "text-muted-foreground"}`}>
+                            {opp.rate1_fmt}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground tabular-nums mt-0.5">{opp.next_funding1}</p>
+                        </div>
+                        <div className="rounded-lg border border-border/40 bg-muted/20 p-2.5">
+                          <p className={`text-xs font-semibold mb-0.5 ${getExchangeColor(opp.exchange2)}`}>{opp.exchange2}</p>
+                          <p className="text-[10px] text-muted-foreground font-mono mb-1">{opp.original_symbol2}</p>
+                          <p className={`text-sm font-bold tabular-nums ${opp.rate2 > 0 ? "text-emerald-400" : opp.rate2 < 0 ? "text-red-400" : "text-muted-foreground"}`}>
+                            {opp.rate2_fmt}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground tabular-nums mt-0.5">{opp.next_funding2}</p>
+                        </div>
+                      </div>
+
+                      {/* Strategy + Profit row */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex flex-wrap gap-1.5">
+                          <Badge variant="outline" className="border-red-500/20 bg-red-500/5 text-red-400 text-[10px] font-semibold gap-1">
+                            <TrendingDownIcon className="h-3 w-3" />
+                            Short {opp.short_exchange}
+                          </Badge>
+                          <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-[10px] font-semibold gap-1">
+                            <TrendingUpIcon className="h-3 w-3" />
+                            Long {opp.long_exchange}
+                          </Badge>
+                        </div>
+                        {positionSize > 0 && (
+                          <div className="text-right">
+                            <span className="text-sm font-bold tabular-nums text-emerald-400">
+                              +${calcProfit(opp.diff).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            <p className="text-[10px] text-muted-foreground">per funding</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Spread */}
+                      <div className="flex items-center">
+                        <span className={`text-[11px] font-semibold tabular-nums ${opp.spread_pct > 0.1 ? 'text-amber-400' : 'text-muted-foreground'}`}>
+                          Spread: {opp.spread_pct.toFixed(4)}% (${opp.price_diff.toFixed(2)})
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              {/* Mobile Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-2">
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                    ‹ Prev
+                  </Button>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    Page <span className="text-foreground font-medium">{currentPage}</span> / <span className="text-foreground font-medium">{totalPages}</span>
+                  </span>
+                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                    Next ›
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        {/* ──────────────── DESKTOP TABLE (lg+) ──────────────── */}
+        {
+          data && data.opportunities.length > 0 && (
+            <Card className="hidden lg:block border-border/50 bg-card/80 backdrop-blur-sm shadow-2xl shadow-black/20 overflow-hidden animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -483,7 +573,6 @@ export default function Home() {
                       <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Strategy</TableHead>
                       <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Funding</TableHead>
                       <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Est. Profit</TableHead>
-                      <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Trade</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -531,9 +620,14 @@ export default function Home() {
 
                           {/* Exchange 1 */}
                           <TableCell>
-                            <span className={`font-semibold text-sm ${getExchangeColor(opp.exchange1)}`}>
-                              {opp.exchange1}
-                            </span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className={`font-semibold text-sm ${getExchangeColor(opp.exchange1)}`}>
+                                {opp.exchange1}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {opp.original_symbol1}
+                              </span>
+                            </div>
                           </TableCell>
 
                           {/* Rate 1 */}
@@ -545,9 +639,14 @@ export default function Home() {
 
                           {/* Exchange 2 */}
                           <TableCell>
-                            <span className={`font-semibold text-sm ${getExchangeColor(opp.exchange2)}`}>
-                              {opp.exchange2}
-                            </span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className={`font-semibold text-sm ${getExchangeColor(opp.exchange2)}`}>
+                                {opp.exchange2}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {opp.original_symbol2}
+                              </span>
+                            </div>
                           </TableCell>
 
                           {/* Rate 2 */}
@@ -641,39 +740,7 @@ export default function Home() {
                             )}
                           </TableCell>
 
-                          {/* Trade Links */}
-                          <TableCell>
-                            <div className="flex gap-1.5">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <a
-                                    href={opp.url1}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-all hover:-translate-y-px no-underline ${getExchangeColor(opp.exchange1)} ${getExchangeBorder(opp.exchange1)}`}
-                                  >
-                                    {opp.exchange1}
-                                    <ExternalLinkIcon />
-                                  </a>
-                                </TooltipTrigger>
-                                <TooltipContent>Trade {opp.symbol} on {opp.exchange1}</TooltipContent>
-                              </Tooltip>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <a
-                                    href={opp.url2}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-all hover:-translate-y-px no-underline ${getExchangeColor(opp.exchange2)} ${getExchangeBorder(opp.exchange2)}`}
-                                  >
-                                    {opp.exchange2}
-                                    <ExternalLinkIcon />
-                                  </a>
-                                </TooltipTrigger>
-                                <TooltipContent>Trade {opp.symbol} on {opp.exchange2}</TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TableCell>
+
                         </TableRow>
                       );
                     })}
