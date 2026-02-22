@@ -9,9 +9,29 @@
 import crypto from "crypto";
 // Ed25519 signing is done via Node's built-in crypto module (no external deps needed)
 
-// Default minimum funding rate difference (raw decimal, not percentage)
-// 0.003 = 0.3% difference in funding rate
-const DEFAULT_MIN_FUNDING_DIFF = 0.003;
+// ---------------------------------------------------------------------------
+// Trading constants
+// ---------------------------------------------------------------------------
+
+// Minimum funding rate difference to surface as opportunity (raw decimal)
+// 0.0005 = 0.05% — realistic threshold for Indian exchanges
+const DEFAULT_MIN_FUNDING_DIFF = 0.0005;
+
+// Taker fee per side per exchange (raw decimal). Adjust per your tier.
+// India exchanges are typically 0.05% taker.
+const TAKER_FEE: Record<string, number> = {
+    CoinSwitch: 0.0005,  // 0.05%
+    Delta: 0.0005,  // 0.05%
+    CoinDCX: 0.0005,  // 0.05%
+};
+
+// Max acceptable price spread between the two legs (pct, not decimal)
+// Above this the basis risk eats the funding edge.
+const MAX_SPREAD_PCT = 0.15;
+
+// Max allowable funding-window misalignment between exchanges (ms)
+// If one exchange funds in 2 min and the other in 6h, the edge is fake.
+const MAX_FUNDING_SKEW_MS = 30 * 60 * 1000; // 30 minutes
 
 // ---------------------------------------------------------------------------
 // Types
@@ -108,7 +128,6 @@ function generateCoinSwitchSignature(
     // Payload format: {timestamp}{HTTP_METHOD}{URL_Path_with_Query_Params}{Request_Body}
     // For GET requests with no body, body should be empty string ""
     const payload = `${timestamp}${method.toUpperCase()}${urlPath}${body}`;
-    console.log(`[CoinSwitch] Signing payload (${payload.length} chars): "${payload}"`);
 
     try {
         const seed = Buffer.from(secretKeyHex, "hex");
@@ -132,7 +151,7 @@ function generateCoinSwitchSignature(
         return signature.toString("hex");
     } catch (e) {
         console.error("Error generating CoinSwitch signature:", e);
-        return "";
+        throw new Error("CoinSwitch signature generation failed");
     }
 }
 
@@ -464,13 +483,12 @@ function normalizeSymbol(sym: string, exchange?: string): string | null {
     sym = sym.toUpperCase().replace(/-/g, "").replace(/_/g, "");
 
     if (exchange === "Delta") {
-        // Delta India: Convert XXXUSD -> XXXUSDT for matching
-        if (
-            sym.endsWith("USD") &&
-            !sym.endsWith("USDT") &&
-            !sym.endsWith("USDC")
-        ) {
-            sym = sym + "T"; // BTCUSD -> BTCUSDT
+        // Delta India: Convert XXXUSD → XXXUSDT for matching.
+        // Use regex so we only match symbols that end with exactly "USD"
+        // (not USDT/USDC) and are purely alphabetic before the suffix.
+        // Prevents XAUUSD → XAUUSDT false-positive for synthetic gold pairs.
+        if (/^[A-Z0-9]+USD$/.test(sym)) {
+            sym = sym + "T"; // BTCUSD → BTCUSDT
         }
     } else if (exchange === "CoinSwitch") {
         // CoinSwitch: symbols might have various prefixes/suffixes
@@ -659,47 +677,58 @@ export async function scan(
             const r2 = available[e2].rate;
             const diff = Math.abs(r1 - r2);
 
-            if (diff >= minDiff) {
-                const shortEx = r1 > r2 ? e1 : e2;
-                const longEx = r1 > r2 ? e2 : e1;
+            // ── Gate 1: raw funding diff must clear the threshold ──────────
+            if (diff < minDiff) continue;
 
-                // Calculate price spread between exchanges
-                const price1 = available[e1].mark_price || 0;
-                const price2 = available[e2].mark_price || 0;
-                const priceDiff = Math.abs(price1 - price2);
-                const avgPrice =
-                    price1 > 0 && price2 > 0 ? (price1 + price2) / 2 : 0;
-                const spreadPct =
-                    avgPrice > 0 ? (priceDiff / avgPrice) * 100 : 0;
+            // ── Gate 2: price spread must not eat the funding edge ─────────
+            const price1 = available[e1].mark_price || 0;
+            const price2 = available[e2].mark_price || 0;
+            const priceDiff = Math.abs(price1 - price2);
+            const avgPrice =
+                price1 > 0 && price2 > 0 ? (price1 + price2) / 2 : 0;
+            const spreadPct =
+                avgPrice > 0 ? (priceDiff / avgPrice) * 100 : 0;
 
-                opportunities.push({
-                    symbol: sym,
-                    exchange1: e1,
-                    exchange2: e2,
-                    original_symbol1: available[e1].original_symbol,
-                    original_symbol2: available[e2].original_symbol,
-                    rate1: r1,
-                    rate2: r2,
-                    rate1_fmt: formatFunding(r1),
-                    rate2_fmt: formatFunding(r2),
-                    diff,
-                    diff_fmt: formatFunding(diff),
-                    short_exchange: shortEx,
-                    long_exchange: longEx,
-                    next_funding1: formatNextFunding(
-                        available[e1].next_funding
-                    ),
-                    next_funding2: formatNextFunding(
-                        available[e2].next_funding
-                    ),
-                    price1,
-                    price2,
-                    price_diff:
-                        Math.round(priceDiff * 10_000) / 10_000,
-                    spread_pct:
-                        Math.round(spreadPct * 10_000) / 10_000,
-                });
-            }
+            if (spreadPct > MAX_SPREAD_PCT) continue;
+
+            // ── Gate 3: net profitability after fees ───────────────────────
+            // Round-trip cost = taker fee on each of the 2 legs (in & out)
+            const roundTripFee =
+                (TAKER_FEE[e1] ?? 0.0005) + (TAKER_FEE[e2] ?? 0.0005);
+            if (diff <= roundTripFee) continue;
+
+            // ── Gate 4: funding windows must be roughly aligned ───────────
+            const nf1 = available[e1].next_funding;
+            const nf2 = available[e2].next_funding;
+            if (
+                nf1 > 0 && nf2 > 0 &&
+                Math.abs(nf1 - nf2) > MAX_FUNDING_SKEW_MS
+            ) continue;
+
+            const shortEx = r1 > r2 ? e1 : e2;
+            const longEx = r1 > r2 ? e2 : e1;
+
+            opportunities.push({
+                symbol: sym,
+                exchange1: e1,
+                exchange2: e2,
+                original_symbol1: available[e1].original_symbol,
+                original_symbol2: available[e2].original_symbol,
+                rate1: r1,
+                rate2: r2,
+                rate1_fmt: formatFunding(r1),
+                rate2_fmt: formatFunding(r2),
+                diff,
+                diff_fmt: formatFunding(diff),
+                short_exchange: shortEx,
+                long_exchange: longEx,
+                next_funding1: formatNextFunding(available[e1].next_funding),
+                next_funding2: formatNextFunding(available[e2].next_funding),
+                price1,
+                price2,
+                price_diff: Math.round(priceDiff * 10_000) / 10_000,
+                spread_pct: Math.round(spreadPct * 10_000) / 10_000,
+            });
         }
     }
 
@@ -1004,14 +1033,34 @@ export async function executeTrade(req: TradeRequest): Promise<TradeResult> {
         }
     };
 
-    // Execute both orders simultaneously
+    // Execute both legs simultaneously
     const [shortResult, longResult] = await Promise.all([
         placeOrder(short_exchange, original_symbol_short, "SELL"),
         placeOrder(long_exchange, original_symbol_long, "BUY"),
     ]);
 
-    const bothSuccess =
-        shortResult.status !== "failed" && longResult.status !== "failed";
+    const shortOk = shortResult.status !== "failed";
+    const longOk = longResult.status !== "failed";
+
+    // ── Atomicity: if one leg failed, hedge the successful leg immediately ──
+    // This prevents a naked directional position from sitting open.
+    if (shortOk && !longOk) {
+        console.error(
+            `[HedgeFallback] Short succeeded but Long failed on ${long_exchange}. ` +
+            `Placing neutralising BUY on ${short_exchange} to close short.`
+        );
+        // Close the short by placing a matching BUY on the short exchange
+        await placeOrder(short_exchange, original_symbol_short, "BUY");
+    } else if (!shortOk && longOk) {
+        console.error(
+            `[HedgeFallback] Long succeeded but Short failed on ${short_exchange}. ` +
+            `Placing neutralising SELL on ${long_exchange} to close long.`
+        );
+        // Close the long by placing a matching SELL on the long exchange
+        await placeOrder(long_exchange, original_symbol_long, "SELL");
+    }
+
+    const bothSuccess = shortOk && longOk;
 
     return {
         success: bothSuccess,
@@ -1020,12 +1069,8 @@ export async function executeTrade(req: TradeRequest): Promise<TradeResult> {
         error: bothSuccess
             ? undefined
             : [
-                shortResult.status === "failed"
-                    ? `Short (${short_exchange}): ${shortResult.error}`
-                    : null,
-                longResult.status === "failed"
-                    ? `Long (${long_exchange}): ${longResult.error}`
-                    : null,
+                !shortOk ? `Short (${short_exchange}): ${shortResult.error}` : null,
+                !longOk ? `Long  (${long_exchange}): ${longResult.error}` : null,
             ]
                 .filter(Boolean)
                 .join(" | "),
