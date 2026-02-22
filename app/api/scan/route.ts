@@ -9,12 +9,11 @@ export const maxDuration = 60;
 export async function GET(request: NextRequest) {
     console.log("Starting funding rate scan...");
     try {
-        // Read query params for threshold and delta toggle
+        // Read query params for threshold
         const searchParams = request.nextUrl.searchParams;
         const threshold = parseFloat(searchParams.get("threshold") || "0.003");
-        const includeDelta = searchParams.get("delta") !== "false";
 
-        const data = await scan(threshold, includeDelta);
+        const data = await scan(threshold);
 
         return NextResponse.json(data);
     } catch (error) {

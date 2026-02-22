@@ -52,7 +52,14 @@ interface ScanResult {
   total_symbols: number;
   opportunities: Opportunity[];
   count: number;
-  include_delta: boolean;
+  exchange_status: Record<string, { connected: boolean; error?: string }>;
+}
+
+interface TradeResult {
+  success: boolean;
+  short_order?: { exchange: string; order_id?: string; status: string; symbol: string; side: string; quantity: number; price?: number; error?: string };
+  long_order?: { exchange: string; order_id?: string; status: string; symbol: string; side: string; quantity: number; price?: number; error?: string };
+  error?: string;
 }
 
 // ======================
@@ -141,14 +148,12 @@ function ChevronDownIcon({ className }: { className?: string }) {
 // ======================
 function getExchangeColor(exchange: string) {
   switch (exchange) {
-    case "Binance":
-      return "text-yellow-400";
-    case "Bybit":
-      return "text-orange-400";
+    case "CoinSwitch":
+      return "text-emerald-400";
     case "Delta":
       return "text-cyan-400";
     case "CoinDCX":
-      return "text-blue-400";
+      return "text-purple-400";
     default:
       return "text-muted-foreground";
   }
@@ -165,14 +170,14 @@ export default function Home() {
   const [usdt, setUsdt] = useState<string>("1000");
   const [leverage, setLeverage] = useState<string>("10");
   const [threshold, setThreshold] = useState<string>("0.3");
-  const [includeDelta, setIncludeDelta] = useState(true);
+  const [tradingOpp, setTradingOpp] = useState<Opportunity | null>(null);
+  const [tradingLoading, setTradingLoading] = useState(false);
+  const [tradeResult, setTradeResult] = useState<TradeResult | null>(null);
 
   const usdtNum = parseFloat(usdt) || 0;
   const leverageNum = parseFloat(leverage) || 0;
   const positionSize = usdtNum * leverageNum;
 
-  // Calculate estimated profit per funding period
-  // Profit = position_size × funding_rate_diff
   const calcProfit = (diff: number) => {
     const profit = positionSize * diff;
     return profit;
@@ -182,11 +187,9 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      // Convert percentage threshold to raw decimal for API
       const thresholdDecimal = (parseFloat(threshold) || 0.3) / 100;
       const params = new URLSearchParams({
         threshold: thresholdDecimal.toString(),
-        delta: includeDelta ? "true" : "false",
       });
       const res = await fetch(`/api/scan?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch scan results");
@@ -196,6 +199,46 @@ export default function Home() {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const executeTrade = async (opp: Opportunity) => {
+    if (positionSize <= 0) {
+      toast.error("Set USDT amount and leverage first");
+      return;
+    }
+    setTradingOpp(opp);
+    setTradeResult(null);
+  };
+
+  const confirmTrade = async () => {
+    if (!tradingOpp) return;
+    setTradingLoading(true);
+    try {
+      const res = await fetch("/api/trade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: tradingOpp.symbol,
+          short_exchange: tradingOpp.short_exchange,
+          long_exchange: tradingOpp.long_exchange,
+          original_symbol_short: tradingOpp.short_exchange === tradingOpp.exchange1 ? tradingOpp.original_symbol1 : tradingOpp.original_symbol2,
+          original_symbol_long: tradingOpp.long_exchange === tradingOpp.exchange1 ? tradingOpp.original_symbol1 : tradingOpp.original_symbol2,
+          quantity: positionSize,
+          leverage: parseFloat(leverage) || 10,
+        }),
+      });
+      const result: TradeResult = await res.json();
+      setTradeResult(result);
+      if (result.success) {
+        toast.success(`Trade executed on ${tradingOpp.short_exchange} & ${tradingOpp.long_exchange}!`);
+      } else {
+        toast.error(result.error || "Trade failed");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Trade failed");
+    } finally {
+      setTradingLoading(false);
     }
   };
 
@@ -256,7 +299,7 @@ export default function Home() {
               </h1>
             </div>
             <p className="text-muted-foreground text-xs sm:text-sm">
-              Real-time funding rate arbitrage — Binance · Bybit · Delta · CoinDCX
+              Real-time funding rate arbitrage — CoinSwitch · Delta · CoinDCX
             </p>
             {data && (
               <div className="sm:hidden flex items-center justify-center gap-2 text-[11px] font-medium text-muted-foreground mt-2">
@@ -273,13 +316,12 @@ export default function Home() {
         {/* ──────────────── STATS ──────────────── */}
         {
           data && (
-            <div className={`grid grid-cols-2 sm:grid-cols-3 ${data.include_delta ? 'lg:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-5'} gap-2 sm:gap-3 mb-6 sm:mb-8 animate-fade-in-up`} style={{ animationDelay: "0.1s" }}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-6 sm:mb-8 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
               {[
                 { label: "Opportunities", value: data.count, color: "text-emerald-400" },
-                { label: "Binance Pairs", value: data.exchange_counts.Binance ?? 0, color: "text-yellow-400" },
-                { label: "Bybit Pairs", value: data.exchange_counts.Bybit ?? 0, color: "text-orange-400" },
-                { label: "CoinDCX Pairs", value: data.exchange_counts.CoinDCX ?? 0, color: "text-blue-400" },
-                ...(data.include_delta ? [{ label: "Delta Pairs", value: data.exchange_counts.Delta ?? 0, color: "text-cyan-400" }] : []),
+                { label: "CoinSwitch", value: data.exchange_counts.CoinSwitch ?? 0, color: "text-emerald-400" },
+                { label: "Delta", value: data.exchange_counts.Delta ?? 0, color: "text-cyan-400" },
+                { label: "CoinDCX", value: data.exchange_counts.CoinDCX ?? 0, color: "text-purple-400" },
                 { label: "Total Symbols", value: data.total_symbols, color: "text-indigo-400" },
               ].map((stat) => (
                 <Card key={stat.label} className="border-border/50 bg-card/50 backdrop-blur-sm">
@@ -424,7 +466,7 @@ export default function Home() {
               <LoaderIcon className="h-12 w-12 animate-spin text-indigo-400 mb-5" />
               <p className="text-lg font-medium text-foreground">Scanning exchanges...</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Fetching rates from Binance, Bybit &amp; Delta Exchange
+                Fetching rates from CoinSwitch, Delta &amp; CoinDCX
               </p>
             </div>
           )
@@ -526,10 +568,17 @@ export default function Home() {
                       </div>
 
                       {/* Spread */}
-                      <div className="flex items-center">
+                      <div className="flex items-center justify-between">
                         <span className={`text-[11px] font-semibold tabular-nums ${opp.spread_pct > 0.1 ? 'text-amber-400' : 'text-muted-foreground'}`}>
                           Spread: {opp.spread_pct.toFixed(4)}% (${opp.price_diff.toFixed(2)})
                         </span>
+                        <Button
+                          size="sm"
+                          onClick={() => executeTrade(opp)}
+                          className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-[11px] font-bold h-7 px-3 shadow-lg shadow-emerald-500/20"
+                        >
+                          ⚡ Trade
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -573,6 +622,7 @@ export default function Home() {
                       <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Strategy</TableHead>
                       <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Funding</TableHead>
                       <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Est. Profit</TableHead>
+                      <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-center">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -740,6 +790,16 @@ export default function Home() {
                             )}
                           </TableCell>
 
+                          {/* Trade Button */}
+                          <TableCell className="text-center">
+                            <Button
+                              size="sm"
+                              onClick={() => executeTrade(opp)}
+                              className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-bold h-8 px-4 shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5"
+                            >
+                              ⚡ Trade
+                            </Button>
+                          </TableCell>
 
                         </TableRow>
                       );
@@ -844,6 +904,134 @@ export default function Home() {
           )
         }
       </div >
+
+      {/* ──────────────── TRADE CONFIRMATION MODAL ──────────────── */}
+      {tradingOpp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in-up" onClick={() => { if (!tradingLoading) { setTradingOpp(null); setTradeResult(null); } }}>
+          <Card className="w-[95%] max-w-lg border-border/50 bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <CardContent className="p-5 sm:p-6">
+              {!tradeResult ? (
+                <>
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-xl shadow-lg">⚡</div>
+                    <div>
+                      <h2 className="text-lg font-bold text-foreground">Execute Arbitrage Trade</h2>
+                      <p className="text-xs text-muted-foreground">Simultaneous orders on both exchanges</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 mb-5">
+                    <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Symbol</p>
+                      <p className="text-base font-bold text-foreground">{tradingOpp.symbol}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                        <div className="flex items-center gap-1 mb-1">
+                          <TrendingDownIcon className="h-3 w-3 text-red-400" />
+                          <span className="text-[10px] font-semibold text-red-400 uppercase">Short</span>
+                        </div>
+                        <p className={`text-sm font-bold ${getExchangeColor(tradingOpp.short_exchange)}`}>{tradingOpp.short_exchange}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums mt-0.5">Rate: {tradingOpp.rate1 > tradingOpp.rate2 ? tradingOpp.rate1_fmt : tradingOpp.rate2_fmt}</p>
+                      </div>
+                      <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+                        <div className="flex items-center gap-1 mb-1">
+                          <TrendingUpIcon className="h-3 w-3 text-emerald-400" />
+                          <span className="text-[10px] font-semibold text-emerald-400 uppercase">Long</span>
+                        </div>
+                        <p className={`text-sm font-bold ${getExchangeColor(tradingOpp.long_exchange)}`}>{tradingOpp.long_exchange}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums mt-0.5">Rate: {tradingOpp.rate1 < tradingOpp.rate2 ? tradingOpp.rate1_fmt : tradingOpp.rate2_fmt}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-lg border border-border/50 bg-muted/20 p-2.5 text-center">
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Position</p>
+                        <p className="text-sm font-bold text-indigo-400 tabular-nums">${positionSize.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-lg border border-border/50 bg-muted/20 p-2.5 text-center">
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Diff</p>
+                        <p className="text-sm font-bold text-amber-400 tabular-nums">{tradingOpp.diff_fmt}</p>
+                      </div>
+                      <div className="rounded-lg border border-border/50 bg-muted/20 p-2.5 text-center">
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Est. Profit</p>
+                        <p className="text-sm font-bold text-emerald-400 tabular-nums">+${calcProfit(tradingOpp.diff).toFixed(2)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button variant="outline" className="flex-1" onClick={() => { setTradingOpp(null); setTradeResult(null); }} disabled={tradingLoading}>
+                      Cancel
+                    </Button>
+                    <Button
+                      className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold shadow-lg shadow-emerald-500/25"
+                      onClick={confirmTrade}
+                      disabled={tradingLoading}
+                    >
+                      {tradingLoading ? (
+                        <><LoaderIcon className="animate-spin mr-2" /> Executing...</>
+                      ) : (
+                        <>\u26a1 Confirm Trade</>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl text-xl shadow-lg ${tradeResult.success ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-red-500 to-rose-600'}`}>
+                      {tradeResult.success ? '✅' : '❌'}
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-foreground">{tradeResult.success ? 'Trade Executed!' : 'Trade Failed'}</h2>
+                      <p className="text-xs text-muted-foreground">{tradingOpp.symbol}</p>
+                    </div>
+                  </div>
+
+                  {tradeResult.error && (
+                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 mb-4">
+                      <p className="text-xs text-red-400">{tradeResult.error}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2 mb-5">
+                    {tradeResult.short_order && (
+                      <div className={`rounded-lg border p-3 ${tradeResult.short_order.status === 'failed' ? 'border-red-500/30 bg-red-500/5' : 'border-emerald-500/30 bg-emerald-500/5'}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-red-400">SHORT — {tradeResult.short_order.exchange}</span>
+                          <Badge variant="outline" className={`text-[10px] ${tradeResult.short_order.status === 'failed' ? 'text-red-400 border-red-500/30' : 'text-emerald-400 border-emerald-500/30'}`}>
+                            {tradeResult.short_order.status}
+                          </Badge>
+                        </div>
+                        {tradeResult.short_order.order_id && <p className="text-[10px] text-muted-foreground mt-1">ID: {tradeResult.short_order.order_id}</p>}
+                        {tradeResult.short_order.error && <p className="text-[10px] text-red-400 mt-1">{tradeResult.short_order.error}</p>}
+                      </div>
+                    )}
+                    {tradeResult.long_order && (
+                      <div className={`rounded-lg border p-3 ${tradeResult.long_order.status === 'failed' ? 'border-red-500/30 bg-red-500/5' : 'border-emerald-500/30 bg-emerald-500/5'}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-emerald-400">LONG — {tradeResult.long_order.exchange}</span>
+                          <Badge variant="outline" className={`text-[10px] ${tradeResult.long_order.status === 'failed' ? 'text-red-400 border-red-500/30' : 'text-emerald-400 border-emerald-500/30'}`}>
+                            {tradeResult.long_order.status}
+                          </Badge>
+                        </div>
+                        {tradeResult.long_order.order_id && <p className="text-[10px] text-muted-foreground mt-1">ID: {tradeResult.long_order.order_id}</p>}
+                        {tradeResult.long_order.error && <p className="text-[10px] text-red-400 mt-1">{tradeResult.long_order.error}</p>}
+                      </div>
+                    )}
+                  </div>
+
+                  <Button variant="outline" className="w-full" onClick={() => { setTradingOpp(null); setTradeResult(null); }}>
+                    Close
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Toaster theme="dark" position="bottom-right" richColors />
     </div >
